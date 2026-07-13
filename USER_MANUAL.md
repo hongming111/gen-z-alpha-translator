@@ -78,6 +78,21 @@ If you don't have an NVIDIA GPU, do data work here and train on Colab (section A
 
 ---
 
+## Using the app later (WITHOUT re-running the notebook)
+
+Once training has run once, an adapter is saved to `genz_lora_adapter/`. After that, launch
+the chat app directly — no training, no Run All:
+```bash
+uv run python app.py
+```
+It loads the base model + your saved adapter and opens the Gradio chat box in your browser.
+(Edit the last line of `app.py` to `app.launch(share=True)` if you want a public link to show others.)
+
+> Teammates need the `genz_lora_adapter/` folder to run `app.py`. It is **not** in GitHub by
+> default (it's a model file). Either: (a) each person trains once, or (b) share the adapter
+> folder via Google Drive / Hugging Face, or (c) commit it (it's small, ~50 MB — ask and we can
+> un-ignore it).
+
 ## How to grade (this is our PRIMARY metric)
 
 1. After the notebook runs, open `results/grading_sheet.csv`.
