@@ -40,6 +40,7 @@ Two audiences:
 | 7 Grading | exports `results/grading_sheet.csv` | instant |
 | 8 Judge | *(optional)* 8B model auto-grades — skip if short on time | ~10 min |
 | 9 Try it | type your own sentence | instant |
+| 10 Chat app | *(optional)* Gradio chat box + public share link for a live demo | ~1 min |
 
 > **First run tip:** keep `TRAIN_SAMPLE = 6000` for a fast end-to-end pass. Once you've
 > seen it work, raise it (or set `None` for all ~31k) and retrain for the final numbers.
