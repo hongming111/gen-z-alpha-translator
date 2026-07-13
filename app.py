@@ -66,5 +66,6 @@ with gr.Blocks(title="Gen Z Slang Translator") as app:
     )
 
 if __name__ == "__main__":
-    # share=True gives a public link; set to False for local-only.
-    app.launch(share=False)
+    # share=True gives a public link (valid ~72h) to send to teammates.
+    # Set to False for local-only.
+    app.launch(share=True)
