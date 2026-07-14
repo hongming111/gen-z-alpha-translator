@@ -26,6 +26,7 @@ import pandas as pd
 from config import (
     EVAL_PATH,
     EVAL_PER_DIRECTION,
+    N_ABSTAIN_TRAIN,
     PROCESSED_DIR,
     RANDOM_SEED,
     RAW_DIR,
@@ -34,6 +35,7 @@ from config import (
     TAG_TO_SLANG,
     TRAIN_PATH,
 )
+from abstain import make_abstain_eval_items, make_abstain_train_examples
 
 
 def _clean(text) -> str:
@@ -164,6 +166,7 @@ def freeze_eval(records: list[dict], rng: random.Random) -> tuple[list[dict], li
         eval_items.append({
             "id": f"e2e_{idx:03d}",              # slang -> English
             "direction": "to_english",
+            "type": "translate",
             "tag": TAG_TO_ENGLISH,
             "input": r["slang"],
             "reference": r["english"],
@@ -174,6 +177,7 @@ def freeze_eval(records: list[dict], rng: random.Random) -> tuple[list[dict], li
         eval_items.append({
             "id": f"e2s_{idx:03d}",              # English -> slang
             "direction": "to_slang",
+            "type": "translate",
             "tag": TAG_TO_SLANG,
             "input": r["english"],
             "reference": r["slang"],
@@ -181,6 +185,9 @@ def freeze_eval(records: list[dict], rng: random.Random) -> tuple[list[dict], li
             "meaning": r["meaning"],
             "strat": r["strat"],
         })
+
+    # Add unanswerable items whose correct behaviour is to abstain.
+    eval_items.extend(make_abstain_eval_items())
     return eval_items, train_rows
 
 
@@ -265,6 +272,12 @@ def main() -> int:
 
     train_examples = build_train(train_rows)
 
+    # Teach abstention: add synthetic 'unclear -> abstain' examples so a future
+    # retrain learns to decline instead of hallucinating on junk input.
+    abstain_examples = make_abstain_train_examples(rng, N_ABSTAIN_TRAIN)
+    train_examples.extend(abstain_examples)
+    print(f"Added {len(abstain_examples)} abstain (unclear->decline) training examples.")
+
     # Safety: eval inputs must NOT appear as training targets/inputs.
     eval_inputs = {it["input"].lower() for it in eval_items}
     leak = sum(
@@ -280,8 +293,9 @@ def main() -> int:
     print("\n--- SUMMARY ---")
     print(f"train.jsonl : {len(train_examples):>5} examples "
           f"(from {len(train_rows)} pairs x 2 directions)")
+    n_unanswerable = sum(1 for it in eval_items if it.get("type") == "unanswerable")
     print(f"eval.jsonl  : {len(eval_items):>5} items "
-          f"({EVAL_PER_DIRECTION} pairs x 2 directions)")
+          f"({EVAL_PER_DIRECTION} pairs x 2 directions + {n_unanswerable} unanswerable)")
     dirs = Counter(it["direction"] for it in eval_items)
     print(f"  eval by direction: {dict(dirs)}")
     strat = Counter(it["strat"] or "unknown" for it in eval_items)

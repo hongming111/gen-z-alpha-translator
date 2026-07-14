@@ -7,6 +7,11 @@ Repo: https://github.com/hm-base/gen-z-alpha-translator
 - Chat **app works**: `uv run python app.py` → open http://127.0.0.1:7860
 - Data pipeline, notebook, eval set (60 items), and grading sheet are all done and in the repo.
 
+## New: "I'm not sure" / abstention (added)
+- The **app already declines** clearly-unclear input (empty, symbols, gibberish) instead of making something up — via a guard, works right now.
+- Training now includes 300 "unclear → abstain" examples and the eval has 10 "unanswerable" items, so **after the next retrain** the model itself learns to abstain and the notebook reports an **abstention accuracy** (base vs tuned).
+- ⚠️ **To activate the model-side abstention + the new metric, re-run the notebook** (retrain). The current committed model was trained before this, so for now only the guard abstains.
+
 ## Get set up (everyone, once)
 ```bash
 git clone https://github.com/hm-base/gen-z-alpha-translator.git

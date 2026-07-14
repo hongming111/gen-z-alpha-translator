@@ -61,3 +61,20 @@ EVAL_PER_DIRECTION = 30
 
 # Reproducibility: fixed seed so the frozen eval set is identical every run.
 RANDOM_SEED = 42
+
+# ---------------------------------------------------------------------------
+# Abstention: when the input isn't clear, the tool should say so instead of
+# inventing a translation. (Matches the proposal's "unanswerable -> abstain;
+# hallucination = failing to abstain" eval.)
+# ---------------------------------------------------------------------------
+ABSTAIN_MESSAGE = "I'm not sure how to translate that — the input isn't clear to me."
+
+# Substrings that mark an output as an abstention (used to auto-detect it).
+ABSTAIN_MARKERS = [
+    "not sure", "isn't clear", "is not clear", "can't translate",
+    "cannot translate", "don't understand", "do not understand", "unclear",
+]
+
+# How many synthetic 'unclear -> abstain' examples to add to TRAINING so a
+# future retrain teaches the behavior. (Small vs the ~31k real examples.)
+N_ABSTAIN_TRAIN = 300

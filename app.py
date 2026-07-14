@@ -16,7 +16,8 @@ from unsloth import FastLanguageModel
 import gradio as gr
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
-from config import TAG_TO_ENGLISH, TAG_TO_SLANG  # noqa: E402
+from config import TAG_TO_ENGLISH, TAG_TO_SLANG, ABSTAIN_MESSAGE  # noqa: E402
+from abstain import looks_unclear  # noqa: E402
 
 ADAPTER_DIR = Path(__file__).resolve().parent / "genz_lora_adapter"
 MAX_SEQ_LEN = 1024
@@ -39,6 +40,9 @@ print(">> ready")
 
 
 def translate(text: str, direction: str) -> str:
+    # Guard: decline clearly-unclear input instead of hallucinating a translation.
+    if looks_unclear(text):
+        return ABSTAIN_MESSAGE
     tag = TAG_TO_ENGLISH if direction.startswith("Slang") else TAG_TO_SLANG
     msgs = [{"role": "user", "content": f"{tag}\n{text}"}]
     ids = tokenizer.apply_chat_template(
