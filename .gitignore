@@ -25,3 +25,6 @@ data/unused/genz_slang_usage_2020_2025.csv
 
 #token
 .hugging token
+
+# Private notes — personal, NOT for the team / not uploaded
+*.private.md
