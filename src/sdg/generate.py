@@ -75,7 +75,11 @@ def main(argv=None) -> int:
 
     if args.pilot:
         for r in sample_recipes(8, seed=999):
-            rec = generate_one(client, r)
+            try:
+                rec = generate_one(client, r)
+            except Exception as e:  # transient API error: show it, keep going
+                print(f"  skip (api error): {e}")
+                rec = None
             print(json.dumps(rec, ensure_ascii=False, indent=2))
             time.sleep(0.3)
         print("\nPILOT: read these — do the pairs fit the recipe? Then run full.")

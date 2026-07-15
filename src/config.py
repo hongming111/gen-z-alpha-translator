@@ -110,7 +110,7 @@ N_ABSTAIN_TRAIN = 300
 # swapped if a given model isn't enabled on your build.nvidia.com account.
 # ---------------------------------------------------------------------------
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-TEACHER_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct"
+TEACHER_MODEL = "meta/llama-3.3-70b-instruct"
 JUDGE_MODEL = TEACHER_MODEL
 
 # Constraint-First SDG settings.
