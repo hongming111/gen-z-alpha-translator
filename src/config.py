@@ -95,3 +95,23 @@ ABSTAIN_MARKERS = [
 # How many synthetic 'unclear -> abstain' examples to add to TRAINING so a
 # future retrain teaches the behavior. (Small vs the ~31k real examples.)
 N_ABSTAIN_TRAIN = 300
+
+# ---------------------------------------------------------------------------
+# NVIDIA teacher/judge (SDG stage 2 + DPO stage 4). Key comes from .env
+# (NVIDIA_API_KEY) — never hard-code it. Model id is one constant so it can be
+# swapped if a given model isn't enabled on your build.nvidia.com account.
+# ---------------------------------------------------------------------------
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+TEACHER_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct"
+JUDGE_MODEL = TEACHER_MODEL
+
+# Constraint-First SDG settings.
+SDG_PATH = RAW_DIR / "synthetic_slang.csv"
+SDG_TARGET = 1200                       # kept pairs to aim for
+SDG_HARD_NEG_FRAC = 0.12                # fraction generated as "bait" hard negatives
+SDG_DIRECTION_WEIGHTS = [("to_english", 0.65), ("to_slang", 0.35)]  # aim at weak dir
+SDG_DIFFICULTY_WEIGHTS = [("clear", 0.5), ("ambiguous", 0.3), ("edge", 0.2)]
+SDG_TONES = ["playful", "hype", "sarcastic", "deadpan", "annoyed",
+             "affectionate", "dramatic", "chill"]
+SDG_CONTEXTS = ["texting a friend", "group chat", "gaming voice chat",
+                "social media caption", "replying to a post", "DM to a crush"]

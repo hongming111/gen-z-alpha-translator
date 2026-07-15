@@ -7,6 +7,7 @@ __pycache__/
 outputs/
 outputs_smoke/
 *.safetensors
+
 # ...but DO track the trained LoRA adapter (~50 MB) so teammates can run app.py:
 !genz_lora_adapter/*.safetensors
 
@@ -28,3 +29,6 @@ data/unused/genz_slang_usage_2020_2025.csv
 
 # Private notes — personal, NOT for the team / not uploaded
 *.private.md
+*nvidia/
+# Secrets
+.env
