@@ -132,7 +132,14 @@ def pairs_from_existing(rng: random.Random, n: int) -> list[dict]:
 
 
 def pairs_held_out_api(rng: random.Random, n: int, model: str) -> list[dict]:
-    """Ask Grok for brand-new pairs (not in existing train CSVs)."""
+    """Ask Grok for brand-new pairs (not in existing train CSVs).
+
+    Important: we need **one unique slang term per pair**. Do NOT exclude every
+    term already used in genz_grok_synthetic.csv — that file covers nearly the
+    whole dictionary, which previously collapsed the pool to ~3 leftover terms
+    (GOAT / Soft Spot / 6Y) and made a useless eval sheet.
+    Fairness comes from *new sentences*, not from never-seen dictionary terms.
+    """
     _load_env()
     import os
 
@@ -145,54 +152,85 @@ def pairs_held_out_api(rng: random.Random, n: int, model: str) -> list[dict]:
     terms = load_terms()
     rng.shuffle(terms)
 
-    # Avoid terms already heavily used in the synthetic file so sentences feel fresh
-    used_terms: set[str] = set()
+    # Soft preference only: try unused-in-synthetic first, but fall back to the
+    # full dictionary so we can always get n unique terms.
+    used_in_synth: set[str] = set()
     grok_path = RAW_DIR / "genz_grok_synthetic.csv"
     if grok_path.exists():
         df = pd.read_csv(grok_path)
-        used_terms = {str(t).strip().lower() for t in df.get("slang_term", []) if str(t).strip()}
+        used_in_synth = {
+            str(t).strip().lower() for t in df.get("slang_term", []) if str(t).strip()
+        }
+    preferred = [t for t in terms if t["term"].lower() not in used_in_synth]
+    term_pool = preferred + [t for t in terms if t["term"].lower() in used_in_synth]
+    print(
+        f"  term pool: {len(terms)} total, {len(preferred)} unused-in-synthetic "
+        f"(will use full pool for unique-term coverage)"
+    )
 
-    term_pool = [t for t in terms if t["term"].lower() not in used_terms] or terms
     kept: list[dict] = []
+    kept_terms: set[str] = set()
     batch_size = 10
     i = 0
     attempts = 0
-    max_attempts = 12
+    max_attempts = 40
 
-    print(f">> generating ~{n} held-out pairs via {model}…")
+    print(f">> generating ~{n} unique-term held-out pairs via {model}…")
     while len(kept) < n and attempts < max_attempts:
         attempts += 1
-        batch = term_pool[i : i + batch_size]
+        # Only feed terms we have not already kept this run
+        remaining = [t for t in term_pool[i:] if t["term"].lower() not in kept_terms]
+        if len(remaining) < batch_size:
+            # wrap / reshuffle unused portion
+            remaining = [t for t in term_pool if t["term"].lower() not in kept_terms]
+            rng.shuffle(remaining)
+            i = 0
+        batch = remaining[:batch_size]
         i += batch_size
         if not batch:
-            rng.shuffle(term_pool)
-            i = 0
-            batch = term_pool[:batch_size]
+            break
         try:
-            raw, items = call_grok(client, model, seeds, batch, temperature=0.9)
+            _raw, items = call_grok(client, model, seeds, batch, temperature=0.9)
         except Exception as e:
             print(f"  batch failed: {e}")
             continue
         for j, item in enumerate(items):
-            fb = batch[j]["term"] if j < len(batch) else ""
+            if len(kept) >= n:
+                break
+            assigned = batch[j] if j < len(batch) else {"term": "", "meaning": ""}
+            fb = assigned.get("term", "")
             pair = normalize_pair(item, fallback_term=fb)
             if pair is None:
                 continue
+            # Lock the term to the one we asked for (Grok sometimes renames / drifts)
+            term = fb or pair["slang_term"]
+            key = term.lower()
+            if not key or key in kept_terms:
+                continue
+            slang = pair["slang_sentence"]
+            # Soft check: prefer sentences that actually contain the term
+            if term and term.lower() not in slang.lower():
+                # still accept if Grok used a close variant, but skip empty junk
+                if len(slang.split()) < 3:
+                    continue
+            meaning = pair["meaning"] or assigned.get("meaning") or term
+            kept_terms.add(key)
             kept.append(
                 {
-                    "slang": pair["slang_sentence"],
+                    "slang": slang,
                     "english": pair["normal_sentence"],
-                    "term": pair["slang_term"],
-                    "meaning": pair["meaning"] or pair["slang_term"],
+                    "term": term,
+                    "meaning": meaning,
                     "strat": "grok_heldout",
                 }
             )
-            if len(kept) >= n:
-                break
-        print(f"  kept {len(kept)}/{n} (attempt {attempts})")
+        print(f"  kept {len(kept)}/{n} unique terms (attempt {attempts})")
 
     if len(kept) < n:
-        raise SystemExit(f"Only got {len(kept)} held-out pairs (need {n}). Re-run or use --from-existing.")
+        raise SystemExit(
+            f"Only got {len(kept)} unique-term held-out pairs (need {n}). "
+            "Re-run or use --from-existing."
+        )
     return kept[:n]
 
 
