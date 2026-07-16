@@ -12,6 +12,7 @@ Usage:
     uv run python src/build_grading_sheet.py
     uv run python src/build_grading_sheet.py --from-existing
     uv run python src/build_grading_sheet.py --n-pairs 30 --skip-inference
+    uv run python src/build_grading_sheet.py --refill-outputs
 """
 
 from __future__ import annotations
@@ -321,10 +322,34 @@ def fill_outputs(items: list[dict], which: str) -> None:
         torch.cuda.empty_cache()
 
 
+def _load_existing_rater_cols() -> dict[str, dict[str, str]]:
+    """Preserve any human scores already entered (keyed by row id)."""
+    path = RESULTS_DIR / "grading_sheet_post_grok.csv"
+    if not path.exists():
+        path = GRADING_CSV
+    if not path.exists():
+        return {}
+    df = pd.read_csv(path, dtype=str).fillna("")
+    out: dict[str, dict[str, str]] = {}
+    for _, r in df.iterrows():
+        rid = str(r.get("id", "")).strip()
+        if not rid:
+            continue
+        out[rid] = {
+            "base_rater1": str(r.get("base_rater1", "")),
+            "base_rater2": str(r.get("base_rater2", "")),
+            "tuned_rater1": str(r.get("tuned_rater1", "")),
+            "tuned_rater2": str(r.get("tuned_rater2", "")),
+        }
+    return out
+
+
 def write_grading_sheet(items: list[dict], note: str) -> Path:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    prior = _load_existing_rater_cols()
     rows = []
     for it in items:
+        scores = prior.get(it["id"], {})
         rows.append(
             {
                 "id": it["id"],
@@ -337,10 +362,10 @@ def write_grading_sheet(items: list[dict], note: str) -> Path:
                 "meaning": it.get("meaning", ""),
                 "base_output": it.get("base_output", ""),
                 "tuned_output": it.get("tuned_output", ""),
-                "base_rater1": "",
-                "base_rater2": "",
-                "tuned_rater1": "",
-                "tuned_rater2": "",
+                "base_rater1": scores.get("base_rater1", ""),
+                "base_rater2": scores.get("base_rater2", ""),
+                "tuned_rater1": scores.get("tuned_rater1", ""),
+                "tuned_rater2": scores.get("tuned_rater2", ""),
             }
         )
     df = pd.DataFrame(rows)
@@ -359,6 +384,18 @@ def write_grading_sheet(items: list[dict], note: str) -> Path:
     return GRADING_CSV
 
 
+def load_eval_items() -> list[dict]:
+    if not EVAL_PATH.exists():
+        raise SystemExit(f"Missing {EVAL_PATH}. Run without --refill-outputs first.")
+    items = []
+    with EVAL_PATH.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                items.append(json.loads(line))
+    return items
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--n-pairs", type=int, default=EVAL_PER_DIRECTION, help="Pairs per direction (default 30)")
@@ -368,8 +405,39 @@ def main() -> int:
         help="Sample from existing Grok/clean CSVs instead of calling the API",
     )
     ap.add_argument("--skip-inference", action="store_true", help="Only freeze eval + rebuild train")
+    ap.add_argument(
+        "--refill-outputs",
+        action="store_true",
+        help="Keep frozen eval.jsonl; regenerate base/tuned outputs only (preserves rater cells)",
+    )
     ap.add_argument("--model", default=DEFAULT_MODEL, help="Grok model for --held-out-api")
     args = ap.parse_args()
+
+    if args.refill_outputs:
+        if not ADAPTER_DIR.exists():
+            raise SystemExit(f"Missing adapter at {ADAPTER_DIR}")
+        print("Backing up grading sheet before refill…")
+        _backup(GRADING_CSV, suffix=".pre_refill.bak")
+        alias = RESULTS_DIR / "grading_sheet_post_grok.csv"
+        _backup(alias, suffix=".pre_refill.bak")
+        items = load_eval_items()
+        print(f">> refilling outputs for {len(items)} frozen eval items…")
+        fill_outputs(items, "base")
+        fill_outputs(items, "tuned")
+        note = (
+            "Refilled base/tuned outputs from frozen eval.jsonl with tightened "
+            "decode (short single-sentence, no option lists).\n"
+            "Eval pairs unchanged; any prior human rater cells were preserved."
+        )
+        write_grading_sheet(items, note)
+        print("\n--- sample rows ---")
+        for it in items[:4]:
+            print(f"{it['id']} [{it['direction']}]")
+            print(f"  IN : {it['input'][:100]}")
+            print(f"  BASE : {str(it.get('base_output', ''))[:120]}")
+            print(f"  TUNED: {str(it.get('tuned_output', ''))[:120]}")
+        print("\nDone. Teammates can continue grading results/grading_sheet_post_grok.csv")
+        return 0
 
     rng = random.Random(RANDOM_SEED)
     print("Backing up previous eval / grading sheet…")
