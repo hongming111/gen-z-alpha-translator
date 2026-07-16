@@ -12,7 +12,7 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from config import NVIDIA_BASE_URL
+from config import TEACHER_BASE_URL, TEACHER_KEY_ENV
 
 load_dotenv()  # read .env into os.environ if present
 
@@ -20,10 +20,10 @@ _THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 def get_client() -> OpenAI:
-    key = os.environ.get("NVIDIA_API_KEY")
+    key = os.environ.get(TEACHER_KEY_ENV)
     if not key:
-        raise RuntimeError("Set NVIDIA_API_KEY in .env (see .env.example).")
-    return OpenAI(base_url=NVIDIA_BASE_URL, api_key=key)
+        raise RuntimeError(f"Set {TEACHER_KEY_ENV} in .env (see .env.example).")
+    return OpenAI(base_url=TEACHER_BASE_URL, api_key=key)
 
 
 def chat(client: OpenAI, prompt: str, *, system: str = "",

@@ -105,12 +105,21 @@ ABSTAIN_MARKERS = [
 N_ABSTAIN_TRAIN = 300
 
 # ---------------------------------------------------------------------------
-# NVIDIA teacher/judge (SDG stage 2 + DPO stage 4). Key comes from .env
-# (NVIDIA_API_KEY) — never hard-code it. Model id is one constant so it can be
-# swapped if a given model isn't enabled on your build.nvidia.com account.
+# Teacher/judge provider (SDG stage 2 + DPO stage 4). Swappable so we're not
+# locked to one API (NVIDIA's free tier was unresponsive). The key lives in
+# .env under the provider's key env var — never hard-coded here.
+#   groq   -> fast + free, hosts Llama 3.3 70B (get a key at console.groq.com)
+#   nvidia -> build.nvidia.com
 # ---------------------------------------------------------------------------
-NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-TEACHER_MODEL = "meta/llama-3.3-70b-instruct"
+TEACHER_PROVIDER = "groq"   # "groq" | "nvidia"
+_TEACHER_PROVIDERS = {
+    "groq":   {"base_url": "https://api.groq.com/openai/v1",      "key_env": "GROQ_API_KEY",   "model": "llama-3.3-70b-versatile"},
+    "nvidia": {"base_url": "https://integrate.api.nvidia.com/v1", "key_env": "NVIDIA_API_KEY", "model": "meta/llama-3.3-70b-instruct"},
+}
+_prov = _TEACHER_PROVIDERS[TEACHER_PROVIDER]
+TEACHER_BASE_URL = _prov["base_url"]
+TEACHER_KEY_ENV = _prov["key_env"]
+TEACHER_MODEL = _prov["model"]
 JUDGE_MODEL = TEACHER_MODEL
 
 # Constraint-First SDG settings.
